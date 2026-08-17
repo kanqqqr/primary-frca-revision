@@ -11,6 +11,7 @@ An offline-friendly Primary FRCA revision app with:
 - Flexible timed exams with weak/due/random selection and balanced chapters
 - Personal notes, issue markers, JSON/CSV question import, and shareable exam setup links
 - Responsive mobile navigation, keyboard shortcuts, larger text, and accessibility improvements
+- Structured answer explanations with answer keys, bold clinical values, book references, and verified source locations
 - Installable offline-friendly PWA support
 
 ## Local development

@@ -27,6 +27,10 @@ type Question = {
   difficulty?: Difficulty;
   reviewedAt?: string;
   page?: string;
+  questionPage?: number;
+  answerPage?: number;
+  questionPdfPage?: number;
+  answerPdfPage?: number;
 };
 type Progress = {
   bookmarked?: boolean;
@@ -195,6 +199,63 @@ function isComplete(q: Question, answers: Answers) {
 function scoreQuestion(q: Question, answers: Answers) {
   if (getFormat(q) === "mcq") return answers.selected === q.answer ? 1 : 0;
   return q.options.reduce((total, option) => total + (answers[option.key] === option.correct ? 1 : 0), 0);
+}
+
+type ExplanationSegment = { kind: "paragraph" | "bullet"; text: string };
+
+const REFERENCE_ENTRY_PATTERN = /\b[A-Z][A-Za-z’'-]+(?:\s+[A-Z][A-Za-z’'-]+)?\s+[A-Z]{1,4}(?:,\s*[A-Z][A-Za-z’'-]+(?:\s+[A-Z][A-Za-z’'-]+)?\s+[A-Z]{1,4}){0,5}\.\s+/g;
+const EMPHASIS_SPLIT_PATTERN = /(\b(?:TRUE|FALSE)\b|\b[A-Z]{2,8}(?:-\d)?\b|[−-]?\d+(?:\.\d+)?\s?(?:%|°C|mg|mcg|μg|g|kg|ml|l|mmHg|kPa|bar|Hz|h|min|days?)\b)/g;
+const EMPHASIS_TOKEN_PATTERN = /^(?:\b(?:TRUE|FALSE)\b|\b[A-Z]{2,8}(?:-\d)?\b|[−-]?\d+(?:\.\d+)?\s?(?:%|°C|mg|mcg|μg|g|kg|ml|l|mmHg|kPa|bar|Hz|h|min|days?)\b)$/;
+
+function splitReferenceEntries(value: string) {
+  const matches = [...value.matchAll(REFERENCE_ENTRY_PATTERN)];
+  if (matches.length < 2) return value.trim() ? [value.trim()] : [];
+  return matches.map((match, index) => value.slice(match.index || 0, matches[index + 1]?.index ?? value.length).trim()).filter(Boolean);
+}
+
+function paragraphize(value: string): ExplanationSegment[] {
+  const chunks = value.replace(/\s*••\s*/g, "\n• ").split(/\n+/).map((chunk) => chunk.trim()).filter(Boolean);
+  return chunks.flatMap((chunk) => {
+    if (chunk.startsWith("• ")) return [{ kind: "bullet" as const, text: chunk.slice(2).trim() }];
+    const sentences = chunk.match(/[^.!?]+(?:[.!?]+(?=\s+[A-Z]|$)|$)/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [chunk];
+    const paragraphs: ExplanationSegment[] = [];
+    let current = "";
+    sentences.forEach((sentence) => {
+      if (current && current.length + sentence.length > 360) {
+        paragraphs.push({ kind: "paragraph", text: current });
+        current = sentence;
+      } else {
+        current = [current, sentence].filter(Boolean).join(" ");
+      }
+    });
+    if (current) paragraphs.push({ kind: "paragraph", text: current });
+    return paragraphs;
+  });
+}
+
+function parseExplanation(value: string) {
+  const trimmed = value.trim();
+  const furtherReadingIndex = trimmed.search(/\bFurther reading\b/i);
+  if (furtherReadingIndex >= 0) {
+    return {
+      segments: paragraphize(trimmed.slice(0, furtherReadingIndex).trim()),
+      references: splitReferenceEntries(trimmed.slice(furtherReadingIndex).replace(/^Further reading\s*/i, "").trim()),
+    };
+  }
+  REFERENCE_ENTRY_PATTERN.lastIndex = 0;
+  const match = REFERENCE_ENTRY_PATTERN.exec(trimmed);
+  REFERENCE_ENTRY_PATTERN.lastIndex = 0;
+  if (match?.index !== undefined && match.index > Math.min(80, trimmed.length * 0.2)) {
+    return {
+      segments: paragraphize(trimmed.slice(0, match.index).trim()),
+      references: splitReferenceEntries(trimmed.slice(match.index).trim()),
+    };
+  }
+  return { segments: paragraphize(trimmed), references: [] as string[] };
+}
+
+function EmphasizedText({ children }: { children: string }) {
+  return <>{children.split(EMPHASIS_SPLIT_PATTERN).map((part, index) => EMPHASIS_TOKEN_PATTERN.test(part) ? <strong className="medical-key" key={`${part}-${index}`}>{part}</strong> : part)}</>;
 }
 
 export default function Home() {
@@ -650,9 +711,34 @@ function QuestionCard({ q, progress, open, onReveal, onBookmark, onNote, onRepor
     <div className="question-head"><span className="question-number">Q{q.number}</span><div className="question-title"><h2>{q.question}</h2><div className="badges"><span className="badge book-badge">{q.book}</span><span className="badge">{q.section}</span><span className={`badge difficulty-${getDifficulty(q, progress)}`}>{getDifficulty(q, progress)}</span>{q.chapters.slice(0, 2).map((chapter) => <span className="badge chapter-badge" key={chapter}>{chapter}</span>)}</div></div><button className={`bookmark ${progress.bookmarked ? "on" : ""}`} onClick={onBookmark} aria-pressed={Boolean(progress.bookmarked)} aria-label={progress.bookmarked ? "Remove bookmark" : "Bookmark question"}>★</button></div>
     <div className="options">{q.options.map((option) => { const correct = mcq ? option.key === q.answer : option.correct; return <div className={`option ${open ? correct ? "correct" : "incorrect" : ""}`} key={option.key}><b>{option.key}.</b><span>{option.text}</span>{open && <em className={correct ? "true" : "false"}>{mcq ? correct ? "Best answer" : "Alternative" : correct ? "True" : "False"}</em>}</div>; })}</div>
     <div className="question-actions"><button className="reveal-button" onClick={onReveal} aria-expanded={open} aria-controls={detailsId}>{open ? "Hide answer and explanation" : "Reveal answer"}</button><button className={`report-button ${progress.reported ? "active" : ""}`} onClick={onReport} aria-pressed={Boolean(progress.reported)}>{progress.reported ? "Marked for checking" : "Report an issue"}</button></div>
-    {open && <div id={detailsId}><div className="explanation"><strong>Explanation</strong><p>{q.explanation}</p></div><label className="note-field"><span>Personal note</span><textarea value={progress.note || ""} onChange={(event) => onNote(event.target.value)} rows={3} placeholder="Add a memory hook, correction, or point to revisit…" /></label></div>}
+    {open && <div id={detailsId}><ExplanationPanel q={q} /><label className="note-field"><span>Personal note</span><textarea value={progress.note || ""} onChange={(event) => onNote(event.target.value)} rows={3} placeholder="Add a memory hook, correction, or point to revisit…" /></label></div>}
     <footer><span>{q.source}{q.page ? ` · p. ${q.page}` : ""}</span><span>{progress.lastAnsweredAt ? `Last reviewed ${new Date(progress.lastAnsweredAt).toLocaleDateString()}` : "Not attempted"}{progress.answered ? ` · ${progress.correct}/${scoreTotal(q)}` : ""}</span></footer>
   </article>;
+}
+
+function ExplanationPanel({ q, result, total }: { q: Question; result?: number; total?: number }) {
+  const { segments, references } = parseExplanation(q.explanation);
+  const titleId = `explanation-title-${q.id}`;
+  const mcq = getFormat(q) === "mcq";
+  return <section className="explanation-panel" aria-labelledby={titleId}>
+    <header className="explanation-header"><div><p className="eyebrow">Answer review</p><h3 id={titleId}>{result !== undefined && total !== undefined ? `${result}/${total} correct` : "Explanation and source"}</h3></div><span className="explanation-book">{q.book}</span></header>
+    <section className="explanation-section answer-key-section"><div className="explanation-section-title"><span>1</span><div><h4>Answer key</h4><p>{mcq ? "The single best answer from the source." : "Each statement is judged independently as True or False."}</p></div></div><ul className="answer-key-list">{q.options.map((option) => { const correct = mcq ? option.key === q.answer : option.correct; return <li key={option.key}><b>{option.key}</b><span>{option.text}</span><em className={correct ? "answer-true" : "answer-false"}>{mcq ? correct ? "Best answer" : "Alternative" : correct ? "True" : "False"}</em></li>; })}</ul></section>
+    <section className="explanation-section"><div className="explanation-section-title"><span>2</span><div><h4>Detailed explanation</h4><p>Key terms, values, and abbreviations are emphasised for faster review.</p></div></div><div className="explanation-copy">{segments.map((segment, index) => segment.kind === "bullet" ? <div className="explanation-bullet" key={index}><i aria-hidden="true" /><p><EmphasizedText>{segment.text}</EmphasizedText></p></div> : <p key={index}><EmphasizedText>{segment.text}</EmphasizedText></p>)}</div></section>
+    {references.length > 0 && <section className="explanation-section"><div className="explanation-section-title"><span>3</span><div><h4>References cited in the book</h4><p>Bibliographic references retained from the source explanation.</p></div></div><ol className="reference-list">{references.map((reference, index) => <li key={`${reference}-${index}`}>{reference}</li>)}</ol></section>}
+    <SourceLocation q={q} step={references.length > 0 ? 4 : 3} />
+  </section>;
+}
+
+function SourceLocation({ q, step }: { q: Question; step: number }) {
+  const hasPages = Boolean(q.questionPage && q.answerPage);
+  return <section className="explanation-section source-location"><div className="explanation-section-title"><span>{step}</span><div><h4>Location in the source book</h4><p>{hasPages ? "Printed page and PDF page are both shown." : "Verified by the paper and question number in the imported source."}</p></div></div><dl>
+    <div><dt>Book</dt><dd>{q.book}</dd></div>
+    <div><dt>{q.section.toLowerCase().startsWith("paper") ? "Paper" : "Section"}</dt><dd>{q.section}</dd></div>
+    <div><dt>Question</dt><dd>{q.number}</dd></div>
+    {q.questionPage && <div><dt>Question page</dt><dd>Printed p. {q.questionPage}{q.questionPdfPage ? ` · PDF p. ${q.questionPdfPage}` : ""}</dd></div>}
+    {q.answerPage && <div><dt>Explanation page</dt><dd>Printed p. {q.answerPage}{q.answerPdfPage ? ` · PDF p. ${q.answerPdfPage}` : ""}</dd></div>}
+    <div className="source-topics"><dt>Topic tags</dt><dd>{q.chapters.join(" · ") || q.section}</dd></div>
+  </dl>{!hasPages && <p className="source-location-note">The uploaded Get Through PDF copy does not expose a recoverable page index, so the site shows its verified paper and question location rather than inventing a page number.</p>}</section>;
 }
 
 function CreateQuestionView({ existingCount, onSave, onImport, onCancel }: { existingCount: number; onSave: (question: Question) => void; onImport: (questions: Question[]) => void; onCancel: () => void }) {
@@ -737,7 +823,7 @@ function PracticeView({ questions, index, setIndex, answers, setAnswer, submitte
   const mcq = getFormat(q) === "mcq";
   return <>
     <section className="hero compact"><div><p className="eyebrow">Untimed practice · {mcq ? "Single-best-answer MCQ" : "True / False MTF"}</p><h1>Think, commit, then learn.</h1><p>{mcq ? "Choose the single best answer and rate your confidence." : "Judge each statement independently and rate your confidence."}</p></div><div className="session-counter">{index + 1} <span>/ {questions.length}</span></div></section>
-    <div className="practice-card"><SessionProgress index={index} total={questions.length} answered={submitted.size} /><div className="badges"><span className="badge book-badge">{q.book}</span><span className="badge">{q.section}</span><span className={`badge difficulty-${getDifficulty(q)}`}>{getDifficulty(q)}</span></div><h2 tabIndex={-1}>{q.question}</h2><AnswerControls q={q} current={current} submitted={isSubmitted} onSelect={(key, value) => setAnswer("practice", q, key, value)} />{!isSubmitted && <ConfidencePicker value={confidence[q.id] || "medium"} onChange={(value) => setConfidence((current: Record<string, Confidence>) => ({ ...current, [q.id]: value }))} />}{result !== null && <div className="result-callout" role="status" aria-live="polite"><strong>{result}/{total} correct</strong><p>{q.explanation}</p><span>Your next review was scheduled automatically from this score and confidence.</span></div>}
+    <div className="practice-card"><SessionProgress index={index} total={questions.length} answered={submitted.size} /><div className="badges"><span className="badge book-badge">{q.book}</span><span className="badge">{q.section}</span><span className={`badge difficulty-${getDifficulty(q)}`}>{getDifficulty(q)}</span></div><h2 tabIndex={-1}>{q.question}</h2><AnswerControls q={q} current={current} submitted={isSubmitted} onSelect={(key, value) => setAnswer("practice", q, key, value)} />{!isSubmitted && <ConfidencePicker value={confidence[q.id] || "medium"} onChange={(value) => setConfidence((current: Record<string, Confidence>) => ({ ...current, [q.id]: value }))} />}{result !== null && <><div className="result-callout compact-result" role="status" aria-live="polite"><strong>{result}/{total} correct</strong><span>Your next review was scheduled automatically from this score and confidence.</span></div><ExplanationPanel q={q} result={result} total={total} /></>}
       <div className="practice-footer session-actions"><button className="secondary-button" disabled={index === 0} onClick={() => setIndex(Math.max(0, index - 1))}>Previous</button>{isSubmitted ? <button className="primary-button" disabled={index === questions.length - 1} onClick={() => setIndex(Math.min(questions.length - 1, index + 1))}>Next question</button> : <button className="primary-button" disabled={!done} onClick={submit}>Submit answer</button>}<button className="secondary-button" onClick={onFinish}>Exit</button></div>
       <p className="shortcut-hint session-shortcuts"><kbd>1–5</kbd> answer · <kbd>Enter</kbd> submit/next · <kbd>←</kbd><kbd>→</kbd> navigate</p>
     </div>

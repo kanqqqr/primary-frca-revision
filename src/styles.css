@@ -47,3 +47,52 @@ html,body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-ser
 }
 @media(hover:none),(pointer:coarse){.shortcut-hint{display:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
+
+/* Structured answer explanations and verified source locations */
+.compact-result{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:14px 16px;border:1px solid color-mix(in srgb,var(--green) 35%,var(--line));border-radius:12px;background:var(--green-soft)}
+.compact-result strong{font-size:15px;letter-spacing:0;text-transform:none;color:var(--green)}
+.compact-result span{color:var(--muted);font-size:12px;line-height:1.5;text-align:right}
+.explanation-panel{margin-top:18px;overflow:hidden;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:0 10px 30px rgba(25,39,67,.055)}
+.explanation-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:19px 20px;background:linear-gradient(135deg,var(--accent-soft),var(--surface));border-bottom:1px solid var(--line)}
+.explanation-header .eyebrow{margin-bottom:5px}
+.explanation-header h3{margin:0;font-size:20px;line-height:1.3;color:var(--ink)}
+.explanation-book{flex:0 0 auto;padding:7px 10px;border:1px solid color-mix(in srgb,var(--accent) 28%,var(--line));border-radius:999px;background:var(--surface);color:var(--accent);font-size:11px;font-weight:850}
+.explanation-section{padding:20px;border-top:1px solid var(--line)}
+.explanation-header+.explanation-section{border-top:0}
+.explanation-section-title{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:start;gap:11px;margin-bottom:15px}
+.explanation-section-title>span{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:var(--accent);color:#fff;font-size:12px;font-weight:900}
+.explanation-section-title h4{margin:1px 0 3px;font-size:15px;line-height:1.35;color:var(--ink)}
+.explanation-section-title p{margin:0;color:var(--muted);font-size:11px;line-height:1.5}
+.answer-key-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.answer-key-list li{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);font-size:13px;line-height:1.5}
+.answer-key-list li>b{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--surface);color:var(--accent)}
+.answer-key-list li>span{min-width:0;color:var(--ink)}
+.answer-key-list em{padding:4px 8px;border-radius:999px;font-size:10px;font-style:normal;font-weight:900;white-space:nowrap}
+.answer-key-list .answer-true{background:var(--green-soft);color:var(--green)}
+.answer-key-list .answer-false{background:var(--red-soft);color:var(--red)}
+.explanation-copy{display:grid;gap:12px;margin-left:45px}
+.explanation-copy>p,.explanation-bullet p{margin:0;color:var(--ink);font-size:calc(14px * var(--text-scale));line-height:1.78}
+.explanation-copy .medical-key{font-weight:850;color:color-mix(in srgb,var(--ink) 76%,var(--accent));background:linear-gradient(transparent 68%,color-mix(in srgb,var(--accent) 18%,transparent) 68%)}
+.explanation-bullet{display:grid;grid-template-columns:9px minmax(0,1fr);align-items:start;gap:10px;padding:11px 12px;border-left:3px solid var(--accent);border-radius:0 9px 9px 0;background:var(--accent-soft)}
+.explanation-bullet i{width:7px;height:7px;margin-top:9px;border-radius:50%;background:var(--accent)}
+.reference-list{display:grid;gap:9px;margin:0 0 0 45px;padding-left:22px}
+.reference-list li{padding-left:5px;color:var(--muted);font-size:12px;line-height:1.65;overflow-wrap:anywhere}
+.reference-list li::marker{color:var(--accent);font-weight:850}
+.source-location{background:color-mix(in srgb,var(--surface2) 78%,var(--surface))}
+.source-location dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 0 45px}
+.source-location dl>div{display:grid;gap:3px;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.source-location dt{color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.source-location dd{margin:0;color:var(--ink);font-size:12px;font-weight:750;line-height:1.5;overflow-wrap:anywhere}
+.source-location .source-topics{grid-column:1/-1}
+.source-location-note{margin:12px 0 0 45px;padding:10px 12px;border-left:3px solid var(--gold);border-radius:0 8px 8px 0;background:#fff9ed;color:var(--muted);font-size:11px;line-height:1.55}
+html[data-theme=dark] .source-location-note{background:#332b1e}
+
+@media(max-width:600px){
+  .compact-result{align-items:flex-start;flex-direction:column}.compact-result span{text-align:left}
+  .explanation-header{align-items:flex-start;padding:16px}.explanation-header h3{font-size:18px}.explanation-book{max-width:42%;white-space:normal;text-align:center}
+  .explanation-section{padding:16px}.explanation-section-title{grid-template-columns:30px minmax(0,1fr)}.explanation-section-title>span{width:29px;height:29px}
+  .answer-key-list li{grid-template-columns:28px minmax(0,1fr);font-size:14px}.answer-key-list em{grid-column:2;justify-self:start}
+  .explanation-copy,.reference-list,.source-location dl,.source-location-note{margin-left:0}
+  .explanation-copy>p,.explanation-bullet p{font-size:calc(15px * var(--text-scale));line-height:1.72}
+  .source-location dl{grid-template-columns:1fr}.source-location .source-topics{grid-column:auto}
+}
