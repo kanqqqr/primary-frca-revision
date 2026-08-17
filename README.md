@@ -6,6 +6,12 @@ An offline-friendly Primary FRCA revision app with:
 - Learning, untimed practice, and timed exam modes
 - Multiple True/False and user-authored single-best-answer MCQs
 - Search, filters, bookmarks, mistake review, progress saving, and dark mode
+- Adaptive spaced-review scheduling with confidence ratings and a due queue
+- Performance dashboard, topic analysis, daily goals, and a mistake notebook
+- Flexible timed exams with weak/due/random selection and balanced chapters
+- Personal notes, issue markers, JSON/CSV question import, and shareable exam setup links
+- Responsive mobile navigation, keyboard shortcuts, larger text, and accessibility improvements
+- Installable offline-friendly PWA support
 
 ## Local development
 
